@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Location</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; }
+  body { display: flex; flex-direction: column; }
+  #bar { padding: 10px 14px; background: #b00020; color: #fff; }
+  #bar b { font-size: 16px; }
+  #status { font-size: 13px; margin-top: 2px; }
+  #map { flex: 1; }
+  #foot { padding: 10px 14px; background: #f5f5f5; text-align: center; }
+  #foot a { color: #1a73e8; font-weight: bold; text-decoration: none; }
+</style>
+</head>
+<body>
+<div id="bar"><b>Emergency live location</b><div id="status">Connecting...</div></div>
+<div id="map"></div>
+<div id="foot"><a id="gmaps" href="#" target="_blank">Open in Google Maps</a></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+var DB = "https://ai-voice-calling-app-55a3e-default-rtdb.asia-southeast1.firebasedatabase.app";
+var id = new URLSearchParams(location.search).get("id");
+var statusEl = document.getElementById("status");
+var gmaps = document.getElementById("gmaps");
+
+var map = L.map("map").setView([20.5937, 78.9629], 5);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: "&copy; OpenStreetMap contributors"
+}).addTo(map);
+
+var marker = null;
+var first = true;
+
+function ago(ms) {
+  var s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (s < 60) return s + " sec ago";
+  return Math.round(s / 60) + " min ago";
+}
+
+function update() {
+  if (!id) { statusEl.textContent = "Invalid link"; return; }
+  fetch(DB + "/live/" + encodeURIComponent(id) + ".json")
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d || d.lat === undefined) { statusEl.textContent = "Waiting for location..."; return; }
+      var pos = [d.lat, d.lng];
+      if (!marker) { marker = L.marker(pos).addTo(map); } else { marker.setLatLng(pos); }
+      if (first) { map.setView(pos, 17); first = false; } else { map.panTo(pos); }
+      gmaps.href = "https://maps.google.com/?q=" + d.lat + "," + d.lng;
+      statusEl.textContent = (d.active === false ? "Emergency ended - " : "LIVE - ") + "updated " + ago(d.time);
+    })
+    .catch(function () { statusEl.textContent = "Connection problem, retrying..."; });
+}
+
+update();
+setInterval(update, 5000);
+</script>
+</body>
+</html>
